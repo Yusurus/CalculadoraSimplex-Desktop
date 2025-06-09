@@ -186,6 +186,7 @@ Este proyecto está bajo la Licencia MIT. Ver el archivo `LICENSE` para más det
 ## 📌 Autor
 
 Desarrollado con 💻 y ☕ por **Yusurus** y **FernandoM42**
+
 📧 Contacto: **[yjru_at@hotmail.com]**
 
 ---
