@@ -5,7 +5,23 @@ class SimplexVista:
     def __init__(self, root):
         self.root = root
         self.root.title("Simplex Solver - Modern GUI")
-        self.root.geometry("1000x800")
+        # Tamaño deseado de la ventana
+        ancho_ventana = 600
+        alto_ventana = 650
+
+        # Obtener tamaño de la pantalla
+        ancho_pantalla = self.root.winfo_screenwidth()
+        alto_pantalla = self.root.winfo_screenheight()
+
+        # Calcular coordenadas para centrar
+        x = (ancho_pantalla // 2) - (ancho_ventana // 2)
+        y = (alto_pantalla // 2) - (alto_ventana // 2)
+
+        # Establecer tamaño y posición centrada
+        self.root.geometry(f"{ancho_ventana}x{alto_ventana}+{x}+{y}")
+
+        # maximizar
+        # self.root.state('zoomed')
         
         # Variables de la interfaz
         self.tipo_problema = tk.StringVar(value="max")
@@ -23,19 +39,70 @@ class SimplexVista:
         
         self.setup_style()
         self.build_ui()
+        
+        # Asegurar que el foco esté en la ventana principal después de la inicialización
+        self.root.after(100, self._restore_focus)
+    
+    def _restore_focus(self):
+        """Restaura el foco a la ventana principal y permite interacción normal"""
+        try:
+            self.root.focus_force()
+            self.root.grab_release()  # Libera cualquier grab modal
+            # Dar foco al campo de número de variables
+            if hasattr(self, 'num_vars_entry'):
+                self.num_vars_entry.focus_set()
+        except:
+            pass
     
     def setup_style(self):
         """Configura el estilo de la interfaz"""
         style = ttk.Style()
         style.theme_use("clam")
-        style.configure("TButton", padding=6, relief="flat", background="#4CAF50", foreground="white")
+        
+        # Configuración mejorada de botones con hover
+        style.configure("TButton", 
+                       padding=6, 
+                       relief="flat", 
+                       background="#4CAF50", 
+                       foreground="white",
+                       borderwidth=0,
+                       focuscolor="none")
+        
+        # Hover effect para botones (verde más oscuro)
+        style.map("TButton",
+                 background=[('active', '#45a049'),  # Verde más oscuro para hover
+                            ('pressed', '#3d8b40')],   # Verde aún más oscuro para pressed
+                 foreground=[('active', 'white'),
+                            ('pressed', 'white')])
+        
+        # Estilo para botones de eliminar (rojo)
+        style.configure("Delete.TButton",
+                       padding=4,
+                       relief="flat",
+                       background="#f44336",
+                       foreground="white",
+                       borderwidth=0,
+                       focuscolor="none")
+        
+        style.map("Delete.TButton",
+                 background=[('active', '#da190b'),
+                            ('pressed', '#c62828')],
+                 foreground=[('active', 'white'),
+                            ('pressed', 'white')])
+        
+        # Otros estilos
         style.configure("TLabel", font=("Arial", 10))
-        style.configure("TEntry", font=("Arial", 10))
+        style.configure("TEntry", 
+                       font=("Arial", 10),
+                       fieldbackground="white",
+                       borderwidth=1,
+                       relief="solid")
+        style.configure("TLabelFrame.Label", font=("Arial", 10, "bold"))
     
     def build_ui(self):
         """Construye toda la interfaz de usuario"""
         notebook = ttk.Notebook(self.root)
-        notebook.pack(fill=tk.BOTH, expand=True)
+        notebook.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
         self.tab_config = ttk.Frame(notebook)
         self.tab_result = ttk.Frame(notebook)
@@ -57,17 +124,22 @@ class SimplexVista:
         config_frame.pack(fill=tk.X, padx=10, pady=5)
 
         # Tipo de problema
-        ttk.Label(config_frame, text="Tipo de problema:").grid(row=0, column=0, sticky="e", padx=5, pady=2)
-        ttk.OptionMenu(config_frame, self.tipo_problema, "max", "max", "min").grid(row=0, column=1, padx=5, pady=2)
+        ttk.Label(config_frame, text="Tipo de problema    :").grid(row=0, column=0, sticky="e", padx=5, pady=5)
+        tipo_menu = ttk.OptionMenu(config_frame, self.tipo_problema, "max", "max", "min")
+        tipo_menu.grid(row=0, column=1, sticky="w", padx=5, pady=5)
 
         # Número de variables
-        ttk.Label(config_frame, text="Número de variables:").grid(row=1, column=0, sticky="e", padx=5, pady=2)
+        ttk.Label(config_frame, text="Número de variables:").grid(row=1, column=0, sticky="e", padx=5, pady=5)
         self.num_vars_entry = ttk.Entry(config_frame, width=10)
-        self.num_vars_entry.grid(row=1, column=1, padx=5, pady=2)
+        self.num_vars_entry.grid(row=1, column=1, sticky="w", padx=5, pady=5)
+        
+        # Añadir validación para que solo acepte números
+        self.num_vars_entry.bind('<KeyRelease>', self._validate_number_input)
 
         # Botón para configurar función objetivo
-        ttk.Button(config_frame, text="Configurar función objetivo", 
-                  command=self._configurar_objetivo).grid(row=2, column=0, columnspan=2, pady=10)
+        config_btn = ttk.Button(config_frame, text="Configurar función objetivo", 
+                               command=self._configurar_objetivo)
+        config_btn.grid(row=2, column=0, columnspan=2, pady=15)
 
         # Función objetivo
         self.area_coeficientes = ttk.LabelFrame(f, text="Función Objetivo")
@@ -95,8 +167,20 @@ class SimplexVista:
         self.text_resultado_principal = scrolledtext.ScrolledText(resultado_frame, 
                                                                 wrap=tk.WORD, 
                                                                 font=("Courier", 11), 
-                                                                height=8)
+                                                                height=8,
+                                                                bg="#fafafa",
+                                                                relief="sunken",
+                                                                borderwidth=1)
         self.text_resultado_principal.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+    
+    def _validate_number_input(self, event):
+        """Valida que el input del número de variables sea un número"""
+        value = event.widget.get()
+        if value and not value.isdigit():
+            # Remover caracteres no numéricos
+            cleaned = ''.join(c for c in value if c.isdigit())
+            event.widget.delete(0, tk.END)
+            event.widget.insert(0, cleaned)
     
     def build_result_tab(self):
         """Construye la pestaña de resultados"""
@@ -116,7 +200,9 @@ class SimplexVista:
         self.text_resultado = scrolledtext.ScrolledText(f, 
                                                        wrap=tk.WORD, 
                                                        font=("Courier", 10),
-                                                       bg="#f8f8f8")
+                                                       bg="#f8f8f8",
+                                                       relief="sunken",
+                                                       borderwidth=1)
         self.text_resultado.pack(expand=True, fill=tk.BOTH, padx=10, pady=5)
     
     def crear_area_coeficientes(self, n):
@@ -129,51 +215,68 @@ class SimplexVista:
         
         # Crear marco para la función objetivo
         obj_frame = ttk.Frame(self.area_coeficientes)
-        obj_frame.pack(pady=5)
+        obj_frame.pack(pady=10)
 
-        ttk.Label(obj_frame, text=f"{self.tipo_problema.get().upper()}:").pack(side=tk.LEFT, padx=5)
+        ttk.Label(obj_frame, text=f"{self.tipo_problema.get().upper()}:", 
+                 font=("Arial", 10, "bold")).pack(side=tk.LEFT, padx=5)
 
         for i in range(n):
             if i > 0:
-                ttk.Label(obj_frame, text="+").pack(side=tk.LEFT, padx=2)
+                ttk.Label(obj_frame, text=" + ").pack(side=tk.LEFT, padx=2)
             
             entry = ttk.Entry(obj_frame, width=8)
             entry.pack(side=tk.LEFT, padx=2)
             entry.insert(0, "0")  # Valor por defecto
+            # Añadir validación para números (incluyendo negativos y decimales)
+            entry.bind('<KeyRelease>', self._validate_coefficient_input)
             self.entradas_coef_obj.append(entry)
             
             ttk.Label(obj_frame, text=f"x{i+1}").pack(side=tk.LEFT, padx=2)
+    
+    def _validate_coefficient_input(self, event):
+        """Valida que el input de coeficientes sea un número válido"""
+        value = event.widget.get()
+        if value and value not in ['-', '.', '-.']:
+            try:
+                float(value)
+            except ValueError:
+                # Si no es un número válido, restaurar el valor anterior
+                event.widget.delete(len(value)-1)
     
     def crear_restriccion(self, n):
         """Crea una nueva restricción en la interfaz"""
         # Crear marco para la restricción
         fila = ttk.Frame(self.area_restricciones)
-        fila.pack(pady=3, fill=tk.X)
+        fila.pack(pady=3, fill=tk.X, padx=5)
 
         entradas = []
         for i in range(n):
             if i > 0:
-                ttk.Label(fila, text="+").pack(side=tk.LEFT, padx=2)
+                ttk.Label(fila, text=" + ").pack(side=tk.LEFT, padx=2)
             
             e = ttk.Entry(fila, width=6)
             e.pack(side=tk.LEFT, padx=2)
             e.insert(0, "0")  # Valor por defecto
+            e.bind('<KeyRelease>', self._validate_coefficient_input)
             entradas.append(e)
             
             ttk.Label(fila, text=f"x{i+1}").pack(side=tk.LEFT, padx=2)
 
         # Tipo de desigualdad
         desigualdad = tk.StringVar(value="<=")
-        ttk.OptionMenu(fila, desigualdad, "<=", "<=", ">=", "=").pack(side=tk.LEFT, padx=5)
+        desig_menu = ttk.OptionMenu(fila, desigualdad, "<=", "<=", ">=", "=")
+        desig_menu.pack(side=tk.LEFT, padx=8)
 
         # Lado derecho
         rhs = ttk.Entry(fila, width=8)
         rhs.pack(side=tk.LEFT, padx=5)
         rhs.insert(0, "0")  # Valor por defecto
+        rhs.bind('<KeyRelease>', self._validate_coefficient_input)
 
-        # Botón para eliminar esta restricción
-        ttk.Button(fila, text="Eliminar", 
-                  command=lambda: self._eliminar_restriccion_especifica(fila)).pack(side=tk.RIGHT, padx=5)
+        # Botón para eliminar esta restricción (con estilo rojo)
+        delete_btn = ttk.Button(fila, text="Eliminar", style="Delete.TButton",
+                               command=lambda: self._eliminar_restriccion_especifica(fila))
+        delete_btn.pack(side=tk.RIGHT, padx=5)
 
         # Agregar a la lista
         restriccion_data = (entradas, desigualdad, rhs, fila)
